@@ -11,8 +11,8 @@ import { exportDashboardAsPdf } from '../lib/exportPdf.js';
 const API_URL =
   (typeof window !== 'undefined' && window.UNBIASED_API_URL) || '/api/analyze';
 
-/* ---------------- Dropzone ---------------- */
-function Dropzone({ kind, accept, file, onFile, onClear }) {
+/* ---------------- Dropzone (multi CSV) ---------------- */
+function Dropzone({ files, onFilesChange, onClear }) {
   const inputRef = useRef(null);
   const elRef = useRef(null);
   const [dragging, setDragging] = useState(false);
@@ -22,9 +22,23 @@ function Dropzone({ kind, accept, file, onFile, onClear }) {
     inputRef.current?.click();
   };
 
+  const handleFiles = (fileList) => {
+    const validFiles = [];
+    for (const f of fileList) {
+      if (f.name.toLowerCase().endsWith('.csv')) {
+        validFiles.push(f);
+      }
+    }
+    if (validFiles.length > 0) {
+      onFilesChange(validFiles);
+    } else {
+      onFilesChange([]);
+    }
+  };
+
   const onChange = (e) => {
-    const f = e.target.files && e.target.files[0];
-    if (f) onFile(f);
+    const newFiles = e.target.files;
+    if (newFiles && newFiles.length) handleFiles(newFiles);
   };
 
   const onDragOver = (e) => {
@@ -35,16 +49,13 @@ function Dropzone({ kind, accept, file, onFile, onClear }) {
   const onDrop = (e) => {
     e.preventDefault();
     setDragging(false);
-    const f = e.dataTransfer.files && e.dataTransfer.files[0];
-    if (f) onFile(f);
+    const droppedFiles = e.dataTransfer.files;
+    if (droppedFiles && droppedFiles.length) handleFiles(droppedFiles);
   };
 
   const cls = ['dropzone'];
   if (dragging) cls.push('dragging');
-  if (file) cls.push('has-file');
-
-  const isDataset = kind === 'dataset';
-  const fileLabel = isDataset ? '.csv' : '.pkl';
+  if (files && files.length) cls.push('has-file');
 
   return (
     <div
@@ -58,61 +69,46 @@ function Dropzone({ kind, accept, file, onFile, onClear }) {
       <input
         ref={inputRef}
         type="file"
-        accept={accept}
+        accept=".csv,text/csv"
+        multiple
         hidden
         onChange={onChange}
       />
       <div className="dz-icon">
-        {isDataset ? (
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
-            <path
-              d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M14 3v6h6M9 13h6M9 17h4"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
-            <path
-              d="M12 2 3 7v10l9 5 9-5V7l-9-5Z"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-            />
-            <path
-              d="m3 7 9 5 9-5M12 12v10"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-            />
-          </svg>
-        )}
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+          <path
+            d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Z"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M14 3v6h6M9 13h6M9 17h4"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
       </div>
-      {!file && (
+      {(!files || files.length === 0) && (
         <div className="dz-body">
           <div className="dz-title">
-            Drop your <strong>{fileLabel}</strong>{' '}
-            {isDataset ? 'dataset' : 'model'}
+            Drop your <strong>.csv</strong> datasets
           </div>
-          <div className="dz-sub">or click to browse</div>
+          <div className="dz-sub">or click to browse (multiple allowed)</div>
         </div>
       )}
-      {file && (
+      {files && files.length > 0 && (
         <div className="dz-file">
           <span className="dz-file-name">
-            {file.name} · {formatBytes(file.size)}
+            {files.length === 1
+              ? `${files[0].name} · ${formatBytes(files[0].size)}`
+              : `${files.length} CSV files selected`}
           </span>
           <button
             type="button"
             className="dz-clear"
-            aria-label="Remove file"
+            aria-label="Remove all files"
             onClick={(e) => {
               e.stopPropagation();
               if (inputRef.current) inputRef.current.value = '';
@@ -127,7 +123,7 @@ function Dropzone({ kind, accept, file, onFile, onClear }) {
   );
 }
 
-/* ---------------- Meta chips ---------------- */
+/* ---------------- Meta chips (unchanged) ---------------- */
 function MetaChip({ label, value }) {
   return (
     <span className="meta-chip">
@@ -157,7 +153,7 @@ function TimestampChip({ date }) {
   );
 }
 
-/* ---------------- KPI card ---------------- */
+/* ---------------- KPI cards (unchanged) ---------------- */
 function KpiCard({ label, value, hint, fillPct, klass }) {
   const cls = ['dash-card', 'kpi'];
   if (klass) cls.push(klass);
@@ -191,7 +187,7 @@ function FairnessKpi({ label, value, unit, hint, fillPct, klass }) {
   );
 }
 
-/* ---------------- Group bar (animates in) ---------------- */
+/* ---------------- Group bar, FeatureRow, Dashboard (unchanged) ---------------- */
 function GroupBar({ name, pct, count }) {
   const [w, setW] = useState(0);
   useEffect(() => {
@@ -230,13 +226,11 @@ function FeatureRow({ name, importance, maxImp }) {
   );
 }
 
-/* ---------------- Dashboard ---------------- */
 function Dashboard({ result, fallbackTimestamp, onDownload, pdfBusy, pdfLabel, dashboardRef }) {
   const m = (result && result.metrics) || {};
   const stamp =
     result && result.timestamp ? new Date(result.timestamp) : fallbackTimestamp;
 
-  // Metric calculations (mirror the original script)
   const dp = typeof m.demographic_parity === 'number' ? m.demographic_parity : null;
   const di = typeof m.disparate_impact === 'number' ? m.disparate_impact : null;
   const eo =
@@ -539,10 +533,10 @@ function Dashboard({ result, fallbackTimestamp, onDownload, pdfBusy, pdfLabel, d
   );
 }
 
-/* ---------------- Detector ---------------- */
+/* ---------------- Detector (main component) ---------------- */
 export default function Detector() {
-  const [files, setFiles] = useState({ dataset: null, model: null });
-  const [formMsg, setFormMsg] = useState(null); // { text, kind }
+  const [files, setFiles] = useState([]);        // array of File objects
+  const [formMsg, setFormMsg] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [result, setResult] = useState(null);
@@ -554,43 +548,32 @@ export default function Detector() {
   const dashboardRef = useRef(null);
 
   const canAnalyse = useMemo(
-    () => Boolean(files.dataset && files.model) && !loading,
+    () => files.length > 0 && !loading,
     [files, loading]
   );
 
-  const setFile = (kind, file, accept) => {
-    const lower = file.name.toLowerCase();
-    const ok = accept.some((ext) => lower.endsWith(ext));
-    if (!ok) {
-      setFormMsg({
-        text: `${kind === 'dataset' ? 'Dataset' : 'Model'} must be a ${accept.join(' / ')} file.`,
-        kind: 'error',
-      });
-      return;
-    }
+  const handleFilesChange = (newFiles) => {
+    setFiles(newFiles);
     setFormMsg(null);
-    setFiles((f) => ({ ...f, [kind]: file }));
   };
 
-  const clearFile = (kind) => {
-    setFiles((f) => ({ ...f, [kind]: null }));
-  };
+  const clearFiles = () => setFiles([]);
 
   const analyse = async () => {
-    if (!files.dataset || !files.model) return;
-    setFormMsg(null);
+    if (files.length === 0) return;
     setLoading(true);
     setShowDashboard(true);
     setFallbackTimestamp(new Date());
 
-    // Smooth-scroll to the dashboard so the user sees the layout.
     requestAnimationFrame(() => {
       dashboardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
     const fd = new FormData();
-    fd.append('dataset', files.dataset, files.dataset.name);
-    fd.append('model', files.model, files.model.name);
+    // Append each CSV file – backend expects 'datasets' as an array
+    files.forEach((file) => {
+      fd.append('datasets', file, file.name);
+    });
 
     try {
       const res = await fetch(API_URL, { method: 'POST', body: fd });
@@ -598,10 +581,8 @@ export default function Detector() {
         const data = await res.json();
         setResult(data);
       }
-      // Non-OK responses leave the dashboard with placeholders — the
-      // backend will populate it once it's wired up.
     } catch {
-      // Network error / no backend — leave dashboard empty, no banner.
+      // keep dashboard empty on network error
     } finally {
       setLoading(false);
     }
@@ -628,8 +609,6 @@ export default function Detector() {
       flashLabel('Export failed — retry');
       return;
     } finally {
-      // If we hit the success path, clear busy here. (Error path manages
-      // its own timing via flashLabel.)
       setPdfBusy(false);
     }
   };
@@ -641,31 +620,19 @@ export default function Detector() {
           <span className="eyebrow">02 — Live audit</span>
           <h2>The Bias Detector.</h2>
           <p className="lead">
-            Upload your dataset and trained model. We send them to the fairness engine,
-            compute four bias metrics across protected cohorts, and return a regulator-ready dashboard.
+            Upload one or more CSV datasets. We send them to the fairness engine,
+            compute four bias metrics across protected cohorts, and return a regulator‑ready dashboard.
           </p>
         </div>
 
         <div className="detector">
           <aside className="detector-controls">
             <div className="control-group">
-              <label>Dataset file</label>
+              <label>CSV Datasets</label>
               <Dropzone
-                kind="dataset"
-                accept=".csv,text/csv"
-                file={files.dataset}
-                onFile={(f) => setFile('dataset', f, ['.csv'])}
-                onClear={() => clearFile('dataset')}
-              />
-            </div>
-            <div className="control-group">
-              <label>Model file</label>
-              <Dropzone
-                kind="model"
-                accept=".pkl,application/octet-stream"
-                file={files.model}
-                onFile={(f) => setFile('model', f, ['.pkl'])}
-                onClear={() => clearFile('model')}
+                files={files}
+                onFilesChange={handleFilesChange}
+                onClear={clearFiles}
               />
             </div>
 
